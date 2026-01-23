@@ -82,147 +82,70 @@ end CategoryTheory
 
 namespace SSet
 
-open Simplicial
+open Simplicial Edge
 
 def coherentIso : SSet := nerve WalkingIso
 
-def coherentIso.hom : coherentIso _⦋1⦌ :=
-  ComposableArrows.mk₁ (X₀ := WalkingIso.zero) (X₁ := WalkingIso.one) ⟨⟩
+namespace coherentIso
 
-def coherentIso.inv : coherentIso _⦋1⦌ :=
-  ComposableArrows.mk₁ (X₀ := WalkingIso.one) (X₁ := WalkingIso.zero) ⟨⟩
-
-def coherentIso.hom_inv_id : coherentIso _⦋2⦌ :=
-  ComposableArrows.mk₂ (X₀ := WalkingIso.zero) (X₁ := WalkingIso.one) (X₂ := WalkingIso.zero) ⟨⟩ ⟨⟩
-
-def coherentIso.inv_hom_id : coherentIso _⦋2⦌ :=
-  ComposableArrows.mk₂ (X₀ := WalkingIso.one) (X₁ := WalkingIso.zero) (X₂ := WalkingIso.one) ⟨⟩ ⟨⟩
-
-def coherentIso_equiv_fun {n : ℕ} : coherentIso _⦋n⦌ ≃ (Fin (n + 1) → Fin 2) where
+def equivFun {n : ℕ} : coherentIso _⦋n⦌ ≃ (Fin (n + 1) → Fin 2) where
   toFun f := f.obj
   invFun f := .mk f (fun _ ↦ ⟨⟩) (fun _ ↦ rfl) (fun _ _ ↦ rfl)
   left_inv _ := rfl
   right_inv _ := rfl
 
 instance (n : ℕ) : DecidableEq (coherentIso _⦋n⦌) :=
-  fun _ _ ↦ decidable_of_iff _ (Equiv.apply_eq_iff_eq coherentIso_equiv_fun)
+  fun _ _ ↦ decidable_of_iff _ (Equiv.apply_eq_iff_eq coherentIso.equivFun)
 
-instance (n : ℕ) : DecidableEq (Δ[n] ⟶ coherentIso) :=
-  fun _ _ ↦ decidable_of_iff _ (yonedaEquiv.apply_eq_iff_eq)
 
-namespace IsIso_of_coherentIso_morphism
+def x₀ : coherentIso _⦋0⦌ :=
+  ComposableArrows.mk₀ WalkingIso.zero
 
-  variable {X : SSet}
-  variable {x₀ x₁ : X _⦋0⦌}
-  variable {f : Edge x₀ x₁}
-  variable (g : coherentIso ⟶ X)
-  variable (h : f.edge = g.app _ coherentIso.hom)
+def x₁ : coherentIso _⦋0⦌ :=
+  ComposableArrows.mk₀ WalkingIso.one
 
-  def vertex_eq_of_eq_simplex_faces
-    {X : SSet}
-    {hom : X _⦋1⦌}
-    {inv : X _⦋1⦌}
-    {h : X _⦋2⦌}
-    (hf : X.δ (2 : Fin 3) h = hom)
-    (hg : X.δ (0 : Fin 3) h = inv)
-    : X.δ (0 : Fin 2) hom = X.δ (1 : Fin 2) inv
-    := by
-      rw [← hf, ← hg]
-      show ((X.map _ ≫ X.map _) h = (X.map _ ≫ X.map _) h)
-      rw [← X.map_comp, ← X.map_comp]
-      rw [← op_comp, ← op_comp]
-      congrm X.map (Quiver.Hom.op ?_) h
-      decide
+def hom : Edge x₀ x₁ where
+  edge := ComposableArrows.mk₁ ⟨⟩
+  src_eq := ComposableArrows.ext₀ rfl
+  tgt_eq := ComposableArrows.ext₀ rfl
 
-  def inv_edge : X _⦋1⦌
-    := g.app _ coherentIso.inv
+def inv : Edge x₁ x₀ where
+  edge := ComposableArrows.mk₁ ⟨⟩
+  src_eq := ComposableArrows.ext₀ rfl
+  tgt_eq := ComposableArrows.ext₀ rfl
 
-  def hom_inv_id_edge : X _⦋2⦌
-    := g.app _ coherentIso.hom_inv_id
+def homInvId : Edge.CompStruct hom inv (Edge.id x₀) where
+  simplex := ComposableArrows.mk₂ ⟨⟩ ⟨⟩
+  d₂ := ComposableArrows.ext₁ rfl rfl rfl
+  d₀ := ComposableArrows.ext₁ rfl rfl rfl
+  d₁ := ComposableArrows.ext₁ rfl rfl rfl
 
-  def inv_hom_id_edge : X _⦋2⦌
-    := g.app _ coherentIso.inv_hom_id
+def invHomId : Edge.CompStruct inv hom (Edge.id x₁) where
+  simplex := ComposableArrows.mk₂ ⟨⟩ ⟨⟩
+  d₂ := ComposableArrows.ext₁ rfl rfl rfl
+  d₀ := ComposableArrows.ext₁ rfl rfl rfl
+  d₁ := ComposableArrows.ext₁ rfl rfl rfl
 
-  def hom_inv_id_d₂
-    : X.δ 2 (hom_inv_id_edge g) = f.edge
-    := by
-      show ((g.app _ ≫ X.map _) _ = _)
-      rw [h]
-      rw [← g.naturality]
-      congrm g.app _ ?_
-      decide
+def isIsoHom : Edge.IsIso coherentIso.hom where
+  inv := inv
+  homInvId := homInvId
+  invHomId := invHomId
 
-  def hom_inv_id_d₀
-    : X.δ 0 (hom_inv_id_edge g) = inv_edge g
-    := by
-      show ((g.app _ ≫ X.map _) _ = _)
-      rw [← g.naturality]
-      rfl
+def isIsoMapHom
+  {X : SSet}
+  (g : coherentIso ⟶ X)
+  : IsIso (coherentIso.hom.map g)
+  := isIsoHom.map g
 
-  def hom_inv_id_d₁
-    : X.δ 1 (hom_inv_id_edge g) = X.σ 0 x₀
-    := by
-      rw [← f.src_eq]
-      rw [h]
-      show ((g.app _ ≫ X.map _) _ = (g.app _ ≫ (X.map _ ≫ X.map _)) _)
-      rw [← X.map_comp]
-      rw [← g.naturality]
-      rw [← g.naturality]
-      congrm g.app _ ?_
-      decide
-
-  def inv_hom_id_d₂
-    : X.δ 2 (inv_hom_id_edge g) = inv_edge g
-    := by
-      show ((g.app _ ≫ X.map _) _ = _)
-      rw [← g.naturality]
-      dsimp
-      congrm g.app _ ?_
-      decide
-
-  def inv_hom_id_d₀
-    : X.δ 0 (inv_hom_id_edge g) = f.edge
-    := by
-      show ((g.app _ ≫ X.map _) _ = _)
-      rw [← g.naturality]
-      exact h.symm
-
-  def inv_hom_id_d₁
-    : X.δ 1 (inv_hom_id_edge g) = X.σ 0 x₁
-    := by
-      rw [← f.tgt_eq]
-      rw [h]
-      show ((g.app _ ≫ X.map _) _ = (g.app _ ≫ (X.map _ ≫ X.map _)) _)
-      rw [← X.map_comp]
-      rw [← g.naturality]
-      rw [← g.naturality]
-      congrm g.app _ ?_
-      decide
-
-end IsIso_of_coherentIso_morphism
-
-open IsIso_of_coherentIso_morphism
-
-def IsIso_of_coherentIso_morphism
+def isIsoOfEqMapHom
   {X : SSet}
   {x₀ x₁ : X _⦋0⦌}
-  (f : Edge x₀ x₁)
-  (g : {g : coherentIso ⟶ X // f.edge = g.app _ coherentIso.hom})
+  {f : Edge x₀ x₁}
+  {g : coherentIso ⟶ X}
+  (hfg : f.edge = g.app _ hom.edge)
   : f.IsIso
-  where
-    inv := .mk
-      (inv_edge g)
-      ((vertex_eq_of_eq_simplex_faces (hom_inv_id_d₂ _ g.property) (hom_inv_id_d₀ _)).symm.trans f.tgt_eq)
-      ((vertex_eq_of_eq_simplex_faces (inv_hom_id_d₂ _) (inv_hom_id_d₀ _ g.property)).trans f.src_eq)
-    hom_inv_id := .mk
-      (hom_inv_id_edge g)
-      (hom_inv_id_d₂ _ g.property)
-      (hom_inv_id_d₀ _)
-      (hom_inv_id_d₁ _ g.property)
-    inv_hom_id := .mk
-      (inv_hom_id_edge g)
-      (inv_hom_id_d₂ _)
-      (inv_hom_id_d₀ _ g.property)
-      (inv_hom_id_d₁ _ g.property)
+  := (isIsoMapHom g).ofEq hfg.symm
+
+end coherentIso
 
 end SSet
