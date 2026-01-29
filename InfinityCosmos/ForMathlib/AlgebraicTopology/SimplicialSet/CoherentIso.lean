@@ -84,59 +84,70 @@ namespace SSet
 
 open Simplicial Edge
 
+/-- The simplicial set that encodes a single isomorphism. Its n-simplices are sequences of arrows in WalkingIso. -/
 def coherentIso : SSet := nerve WalkingIso
 
 namespace coherentIso
 
+/-- Since the morphisms in WalkingIso do not carry information, an n-simplex of coherentIso is equivalent to an (n + 1)-vector of the objects of WalkingIso. -/
 def equivFun {n : ℕ} : coherentIso _⦋n⦌ ≃ (Fin (n + 1) → Fin 2) where
   toFun f := f.obj
   invFun f := .mk f (fun _ ↦ ⟨⟩) (fun _ ↦ rfl) (fun _ _ ↦ rfl)
   left_inv _ := rfl
   right_inv _ := rfl
 
+/-- Since Fin 2 has decidable equality, the simplices of coherentIso have decidable equality as well. -/
 instance (n : ℕ) : DecidableEq (coherentIso _⦋n⦌) :=
   fun _ _ ↦ decidable_of_iff _ (Equiv.apply_eq_iff_eq coherentIso.equivFun)
 
-
+/-- The source vertex of `coherentIso`. -/
 def x₀ : coherentIso _⦋0⦌ :=
   ComposableArrows.mk₀ WalkingIso.zero
 
+/-- The target edge of `coherentIso`. -/
 def x₁ : coherentIso _⦋0⦌ :=
   ComposableArrows.mk₀ WalkingIso.one
 
+/-- The forwards edge of `coherentIso`. -/
 def hom : Edge x₀ x₁ where
   edge := ComposableArrows.mk₁ ⟨⟩
   src_eq := ComposableArrows.ext₀ rfl
   tgt_eq := ComposableArrows.ext₀ rfl
 
+/-- The backwards edge of `coherentIso`. -/
 def inv : Edge x₁ x₀ where
   edge := ComposableArrows.mk₁ ⟨⟩
   src_eq := ComposableArrows.ext₀ rfl
   tgt_eq := ComposableArrows.ext₀ rfl
 
+/-- The forwards and backwards edge of `coherentIso` compose to the identity. -/
 def homInvId : Edge.CompStruct hom inv (Edge.id x₀) where
   simplex := ComposableArrows.mk₂ ⟨⟩ ⟨⟩
   d₂ := ComposableArrows.ext₁ rfl rfl rfl
   d₀ := ComposableArrows.ext₁ rfl rfl rfl
   d₁ := ComposableArrows.ext₁ rfl rfl rfl
 
+/-- The backwards and forwards edge of `coherentIso` compose to the identity. -/
 def invHomId : Edge.CompStruct inv hom (Edge.id x₁) where
   simplex := ComposableArrows.mk₂ ⟨⟩ ⟨⟩
   d₂ := ComposableArrows.ext₁ rfl rfl rfl
   d₀ := ComposableArrows.ext₁ rfl rfl rfl
   d₁ := ComposableArrows.ext₁ rfl rfl rfl
 
+/-- The forwards edge of `coherentIso` is an isomorphism. -/
 def isIsoHom : Edge.IsIso coherentIso.hom where
   inv := inv
   homInvId := homInvId
   invHomId := invHomId
 
+/-- The image of `hom` under an SSet morphism is an isomorphism. -/
 def isIsoMapHom
   {X : SSet}
   (g : coherentIso ⟶ X)
   : IsIso (coherentIso.hom.map g)
   := isIsoHom.map g
 
+/-- If an edge is equal to the image of `hom` under an SSet morphism, this edge is an isomorphism. -/
 def isIsoOfEqMapHom
   {X : SSet}
   {x₀ x₁ : X _⦋0⦌}
