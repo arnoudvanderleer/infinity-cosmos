@@ -4,21 +4,23 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Johns Hopkins Category Theory Seminar
 -/
 
-import InfinityCosmos.ForMathlib.AlgebraicTopology.SimplicialCategory.Basic
 import Mathlib.AlgebraicTopology.SimplicialSet.Nerve
-import Mathlib.AlgebraicTopology.SimplicialSet.StdSimplex
+import Mathlib.AlgebraicTopology.SimplicialSet.CompStruct
+import InfinityCosmos.ForMathlib.AlgebraicTopology.SimplicialSet.CompStruct
+import InfinityCosmos.ForMathlib.AlgebraicTopology.SimplicialCategory.Basic
 
-universe u v u' v'
+universe u v
 
-open CategoryTheory Nat
+open CategoryTheory
 
 namespace CategoryTheory
 
 /-- This is the free-living isomorphism as a category with objects called
 `zero` and `one`. Perhaps these should have different names?-/
-inductive WalkingIso : Type u where
-  | zero : WalkingIso
-  | one : WalkingIso
+def WalkingIso : Type := Fin 2
+
+def WalkingIso.zero : WalkingIso := (0 : Fin 2)
+def WalkingIso.one : WalkingIso := (1 : Fin 2)
 
 open WalkingIso
 
@@ -33,7 +35,7 @@ instance : Category (WalkingIso) where
 
 section
 
-variable {C : Type u'} [Category.{v'} C]
+variable {C : Type u} [Category.{v} C]
 
 /-- Functors out of `WalkingIso` define isomorphisms in the target category.-/
 def toIso  (F : WalkingIso ⥤ C) : (F.obj zero) ≅ (F.obj one) where
@@ -46,14 +48,14 @@ def toIso  (F : WalkingIso ⥤ C) : (F.obj zero) ≅ (F.obj one) where
 that category.-/
 def fromIso {X Y : C} (e : X ≅ Y) : WalkingIso ⥤ C where
   obj := fun
-    | zero => X
-    | one => Y
+    | (0 : Fin 2) => X
+    | (1 : Fin 2) => Y
   map := @fun
-    | zero, zero, _ => 𝟙 _
-    | zero, one,  _ => e.hom
-    | one,  zero, _ => e.inv
-    | one,  one,  _ => 𝟙 _
-  map_comp := by rintro (_ | _) (_ | _) (_ | _) _ _ <;> simp
+    | (0 : Fin 2), (0 : Fin 2), _ => 𝟙 _
+    | (0 : Fin 2), (1 : Fin 2),  _ => e.hom
+    | (1 : Fin 2), (0 : Fin 2), _ => e.inv
+    | (1 : Fin 2), (1 : Fin 2),  _ => 𝟙 _
+  map_comp := by simp [WalkingIso, Quiver.Hom]
 
 def equiv : (WalkingIso ⥤ C) ≃ Σ (X : C) (Y : C), (X ≅ Y) where
   toFun F := ⟨F.obj zero, F.obj one, toIso F⟩
@@ -61,10 +63,14 @@ def equiv : (WalkingIso ⥤ C) ≃ Σ (X : C) (Y : C), (X ≅ Y) where
   right_inv := fun ⟨X, Y, e⟩ ↦ rfl
   left_inv F := by
     apply Functor.hext
-    · intro i; cases i <;> rfl
-    · intro i j
+    · simp [WalkingIso]
+      constructor <;> rfl
+    · simp [WalkingIso]
       simp only [fromIso, toIso]
-      cases i <;> cases j <;> intro ⟨⟩ <;> simp only [heq_eq_eq] <;> rw [← F.map_id] <;> rfl
+      constructor <;> constructor <;>
+      ( intro ⟨⟩
+        try rfl
+        try (rw [← F.map_id]; rfl) )
 
 end
 
@@ -76,11 +82,81 @@ end CategoryTheory
 
 namespace SSet
 
-def coherentIso : SSet.{u} := nerve WalkingIso
+open Simplicial Edge
 
-open Simplicial SimplicialCategory
+/-- The simplicial set that encodes a single isomorphism. Its n-simplices are sequences of arrows in WalkingIso. -/
+def coherentIso : SSet := nerve WalkingIso
 
-def coherentIso.pt (i : WalkingIso) : Δ[0] ⟶ coherentIso :=
-  yonedaEquiv.symm (WalkingIso.coev i)
+namespace coherentIso
+
+/-- Since the morphisms in WalkingIso do not carry information, an n-simplex of coherentIso is equivalent to an (n + 1)-vector of the objects of WalkingIso. -/
+def equivFun {n : ℕ} : coherentIso _⦋n⦌ ≃ (Fin (n + 1) → Fin 2) where
+  toFun f := f.obj
+  invFun f := .mk f (fun _ ↦ ⟨⟩) (fun _ ↦ rfl) (fun _ _ ↦ rfl)
+  left_inv _ := rfl
+  right_inv _ := rfl
+
+/-- Since Fin 2 has decidable equality, the simplices of coherentIso have decidable equality as well. -/
+instance (n : ℕ) : DecidableEq (coherentIso _⦋n⦌) :=
+  fun _ _ ↦ decidable_of_iff _ (Equiv.apply_eq_iff_eq coherentIso.equivFun)
+
+/-- The source vertex of `coherentIso`. -/
+def x₀ : coherentIso _⦋0⦌ :=
+  ComposableArrows.mk₀ WalkingIso.zero
+
+/-- The target edge of `coherentIso`. -/
+def x₁ : coherentIso _⦋0⦌ :=
+  ComposableArrows.mk₀ WalkingIso.one
+
+/-- The forwards edge of `coherentIso`. -/
+def hom : Edge x₀ x₁ where
+  edge := ComposableArrows.mk₁ ⟨⟩
+  src_eq := ComposableArrows.ext₀ rfl
+  tgt_eq := ComposableArrows.ext₀ rfl
+
+/-- The backwards edge of `coherentIso`. -/
+def inv : Edge x₁ x₀ where
+  edge := ComposableArrows.mk₁ ⟨⟩
+  src_eq := ComposableArrows.ext₀ rfl
+  tgt_eq := ComposableArrows.ext₀ rfl
+
+/-- The forwards and backwards edge of `coherentIso` compose to the identity. -/
+def homInvId : Edge.CompStruct hom inv (Edge.id x₀) where
+  simplex := ComposableArrows.mk₂ ⟨⟩ ⟨⟩
+  d₂ := ComposableArrows.ext₁ rfl rfl rfl
+  d₀ := ComposableArrows.ext₁ rfl rfl rfl
+  d₁ := ComposableArrows.ext₁ rfl rfl rfl
+
+/-- The backwards and forwards edge of `coherentIso` compose to the identity. -/
+def invHomId : Edge.CompStruct inv hom (Edge.id x₁) where
+  simplex := ComposableArrows.mk₂ ⟨⟩ ⟨⟩
+  d₂ := ComposableArrows.ext₁ rfl rfl rfl
+  d₀ := ComposableArrows.ext₁ rfl rfl rfl
+  d₁ := ComposableArrows.ext₁ rfl rfl rfl
+
+/-- The forwards edge of `coherentIso` is an isomorphism. -/
+def isIsoHom : Edge.IsIso coherentIso.hom where
+  inv := inv
+  homInvId := homInvId
+  invHomId := invHomId
+
+/-- The image of `hom` under an SSet morphism is an isomorphism. -/
+def isIsoMapHom
+  {X : SSet}
+  (g : coherentIso ⟶ X)
+  : IsIso (coherentIso.hom.map g)
+  := isIsoHom.map g
+
+/-- If an edge is equal to the image of `hom` under an SSet morphism, this edge is an isomorphism. -/
+def isIsoOfEqMapHom
+  {X : SSet}
+  {x₀ x₁ : X _⦋0⦌}
+  {f : Edge x₀ x₁}
+  {g : coherentIso ⟶ X}
+  (hfg : f.edge = g.app _ hom.edge)
+  : f.IsIso
+  := (isIsoMapHom g).ofEq hfg.symm
+
+end coherentIso
 
 end SSet
