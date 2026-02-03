@@ -17,10 +17,13 @@ namespace CategoryTheory
 
 /-- This is the free-living isomorphism as a category with objects called
 `zero` and `one`. Perhaps these should have different names?-/
-def WalkingIso : Type := Fin 2
+def WalkingIso : Type u := ULift (Fin 2)
 
-def WalkingIso.zero : WalkingIso := (0 : Fin 2)
-def WalkingIso.one : WalkingIso := (1 : Fin 2)
+@[match_pattern]
+def WalkingIso.zero : WalkingIso := ULift.up (0 : Fin 2)
+
+@[match_pattern]
+def WalkingIso.one : WalkingIso := ULift.up (1 : Fin 2)
 
 open WalkingIso
 
@@ -48,13 +51,13 @@ def toIso  (F : WalkingIso ⥤ C) : (F.obj zero) ≅ (F.obj one) where
 that category.-/
 def fromIso {X Y : C} (e : X ≅ Y) : WalkingIso ⥤ C where
   obj := fun
-    | (0 : Fin 2) => X
-    | (1 : Fin 2) => Y
+    | zero => X
+    | one => Y
   map := @fun
-    | (0 : Fin 2), (0 : Fin 2), _ => 𝟙 _
-    | (0 : Fin 2), (1 : Fin 2),  _ => e.hom
-    | (1 : Fin 2), (0 : Fin 2), _ => e.inv
-    | (1 : Fin 2), (1 : Fin 2),  _ => 𝟙 _
+    | zero, zero, _ => 𝟙 _
+    | zero, one,  _ => e.hom
+    | one, zero, _ => e.inv
+    | one, one,  _ => 𝟙 _
   map_comp := by simp [WalkingIso, Quiver.Hom]
 
 def equiv : (WalkingIso ⥤ C) ≃ Σ (X : C) (Y : C), (X ≅ Y) where
@@ -91,8 +94,8 @@ namespace coherentIso
 
 /-- Since the morphisms in WalkingIso do not carry information, an n-simplex of coherentIso is equivalent to an (n + 1)-vector of the objects of WalkingIso. -/
 def equivFun {n : ℕ} : coherentIso _⦋n⦌ ≃ (Fin (n + 1) → Fin 2) where
-  toFun f := f.obj
-  invFun f := .mk f (fun _ ↦ ⟨⟩) (fun _ ↦ rfl) (fun _ _ ↦ rfl)
+  toFun f := ULift.down ∘ f.obj
+  invFun f := .mk (ULift.up ∘ f) (fun _ ↦ ⟨⟩) (fun _ ↦ rfl) (fun _ _ ↦ rfl)
   left_inv _ := rfl
   right_inv _ := rfl
 

@@ -101,9 +101,9 @@ namespace QCat
 
 open SSet
 
-/-- Equivalence of quasi-categories. TODO: ulift coherent iso to fix universe levels.-/
+/-- Equivalence of quasi-categories. -/
 @[nolint unusedArguments]
-def Equiv (A B : SSet.{0}) [Quasicategory A] [Quasicategory B] :=
+def Equiv (A B : SSet.{u}) [Quasicategory A] [Quasicategory B] :=
     SSet.Equiv (I := coherentIso) A B
 
 end QCat
