@@ -60,6 +60,7 @@ def fromIso {X Y : C} (e : X ≅ Y) : WalkingIso ⥤ C where
     | one, one,  _ => 𝟙 _
   map_comp := by simp [WalkingIso, Quiver.Hom]
 
+/-- An equivalence between the type of `WalkingIso`s in `C` and the type of isomorphisms in `C`. -/
 def equiv : (WalkingIso ⥤ C) ≃ Σ (X : C) (Y : C), (X ≅ Y) where
   toFun F := ⟨F.obj zero, F.obj one, toIso F⟩
   invFun p := fromIso p.2.2
