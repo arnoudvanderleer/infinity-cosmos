@@ -4,12 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Julian Komaromy
 -/
 import Mathlib.AlgebraicTopology.Quasicategory.Basic
+import Mathlib.AlgebraicTopology.SimplicialSet.CompStructTruncated
 import Mathlib.AlgebraicTopology.SimplicialSet.HomotopyCat
-import Mathlib.AlgebraicTopology.SimplicialSet.HomotopyCat
+import Mathlib.CategoryTheory.Category.ReflQuiv
 import InfinityCosmos.ForMathlib.AlgebraicTopology.SimplicialSet.Horn
 import InfinityCosmos.ForMathlib.AlgebraicTopology.SimplicialSet.StdSimplex
 import InfinityCosmos.ForMathlib.AlgebraicTopology.SimplicialSet.Basic
-import Mathlib.CategoryTheory.Category.ReflQuiv
 
 open Simplicial SimplexCategory CategoryTheory SimplexCategory.Truncated Truncated.Hom
   SimplicialObject SimplicialObject.Truncated
@@ -17,32 +17,14 @@ open Simplicial SimplexCategory CategoryTheory SimplexCategory.Truncated Truncat
 namespace SSet
 namespace Truncated
 
-section comp_struct
-
-/--
-`Edge x₀ x₁` is a wrapper around a 1-simplex in a 2-truncated simplicial set
-with source `x₀` and target `x₁`.
--/
-structure Edge {X : Truncated 2} (x₀ : X _⦋0⦌₂) (x₁ : X _⦋0⦌₂) where
-  simplex : X _⦋1⦌₂
-  h₀ : X.map (tr (δ 1)).op simplex = x₀
-  h₁ : X.map (tr (δ 0)).op simplex = x₁
+namespace Edge
 
 abbrev edgeMap {S : SSet} {y₀ y₁ : ((truncation 2).obj S) _⦋0⦌₂} (e : Edge y₀ y₁) : Δ[1] ⟶ S :=
-  yonedaEquiv.symm e.simplex
+  yonedaEquiv.symm e.edge
 
-/--
-`CompStruct e₀₁ e₁₂ e₀₂` is a wrapper around a 2-simplex in a 2-truncated simplicial set
-with edges `e₀₁`, `e₁₂`, `e₀₂` in the obvious configuration.
--/
-structure CompStruct {X : Truncated 2} {x₀ x₁ x₂ : X _⦋0⦌₂}
-    (e₀₁ : Edge x₀ x₁) (e₁₂ : Edge x₁ x₂) (e₀₂ : Edge x₀ x₂) where
-  simplex : X _⦋2⦌₂
-  h₀₁ : X.map (tr (δ 2)).op simplex = e₀₁.simplex
-  h₁₂ : X.map (tr (δ 0)).op simplex = e₁₂.simplex
-  h₀₂ : X.map (tr (δ 1)).op simplex = e₀₂.simplex
-end comp_struct
+end Edge
 
+open Edge
 /--
 A 2-truncated quasicategory is a 2-truncated simplicial set with 3 properties:
   (2, 1)-filling: any path of length 2 in may be filled to a 2-simplex whose
@@ -78,7 +60,8 @@ class Quasicategory₂ (X : Truncated 2) where
 end Truncated
 
 namespace horn₂₁
-open Truncated (Edge edgeMap CompStruct truncEquiv trunc_map trunc_map')
+open Truncated (Edge Edge.edgeMap Edge.CompStruct truncEquiv trunc_map trunc_map')
+open Truncated.Edge
 
 variable {S : SSet} {x₀ x₁ x₂ : ((truncation 2).obj S) _⦋0⦌₂}
   (e₀₁ : Edge x₀ x₁) (e₁₂ : Edge x₁ x₂)
@@ -87,8 +70,8 @@ lemma path_edges_comm : pt₁ ≫ edgeMap e₁₂ = pt₀ ≫ edgeMap e₀₁ :=
   rw [map_comp_yonedaEquiv_symm, map_comp_yonedaEquiv_symm]
   congr 1
   apply Eq.trans
-  . exact e₁₂.h₀
-  . symm; exact e₀₁.h₁
+  . exact e₁₂.src_eq
+  . symm; exact e₀₁.tgt_eq
 
 /--
 Given the data of two consecutive edges `e₀₁` and `e₁₂`, construct a map
@@ -101,12 +84,12 @@ def fromEdges : Λ[2, 1].toSSet ⟶ S :=
     (edgeMap e₁₂) (edgeMap e₀₁) (path_edges_comm e₀₁ e₁₂)
 
 /-- See `horn_from_edges` for details. -/
-lemma horn_from_edges_restr₀ : ι₀ ≫ (fromEdges e₀₁ e₁₂) = yonedaEquiv.symm e₁₂.simplex :=
+lemma horn_from_edges_restr₀ : ι₀ ≫ (fromEdges e₀₁ e₁₂) = yonedaEquiv.symm e₁₂.edge :=
   Limits.PushoutCocone.IsColimit.inl_desc pushoutIsPushout
     (edgeMap e₁₂) (edgeMap e₀₁) (path_edges_comm e₀₁ e₁₂)
 
 /-- See `horn_from_edges` for details. -/
-lemma horn_from_edges_restr₁ : ι₂ ≫ (fromEdges e₀₁ e₁₂) = yonedaEquiv.symm e₀₁.simplex :=
+lemma horn_from_edges_restr₁ : ι₂ ≫ (fromEdges e₀₁ e₁₂) = yonedaEquiv.symm e₀₁.edge :=
   Limits.PushoutCocone.IsColimit.inr_desc pushoutIsPushout
     (edgeMap e₁₂) (edgeMap e₀₁) (path_edges_comm e₀₁ e₁₂)
 
@@ -118,13 +101,13 @@ by `CompStruct e₀₁ e₁₂ e₀₂`).
 def fromHornExtension
     (g : Δ[2] ⟶ S)
     (comm : fromEdges e₀₁ e₁₂ = Λ[2, 1].ι ≫ g) :
-    Σ e₀₂ : Edge x₀ x₂, CompStruct e₀₁ e₁₂ e₀₂ := by
+    Σ e₀₂ : Edge x₀ x₂, Edge.CompStruct e₀₁ e₁₂ e₀₂ := by
   constructor; swap
   exact {
-    simplex := (truncEquiv 2) <| yonedaEquiv <| stdSimplex.δ 1 ≫ g
-    h₀ := by
-      rw [← e₀₁.h₀, trunc_map, trunc_map']
-      have : yonedaEquiv.symm (e₀₁.simplex) = stdSimplex.δ 2 ≫ g := by
+    edge := (truncEquiv 2) <| yonedaEquiv <| stdSimplex.δ 1 ≫ g
+    src_eq := by
+      rw [← e₀₁.src_eq, trunc_map, trunc_map']
+      have : yonedaEquiv.symm (e₀₁.edge) = stdSimplex.δ 2 ≫ g := by
         rw [← horn_from_edges_restr₁ e₀₁ e₁₂, comm, ← Category.assoc, horn₂₁.incl₂]
       rw [push_yonedaEquiv this]
       have : δ 1 ≫ δ 2 = δ 1 ≫ @δ 1 1 :=
@@ -132,9 +115,9 @@ def fromHornExtension
       rw [this]
       apply push_yonedaEquiv
       rw [Equiv.symm_apply_apply]; rfl
-    h₁ := by
-      rw [← e₁₂.h₁, trunc_map, trunc_map']
-      have : yonedaEquiv.symm (e₁₂.simplex) = stdSimplex.δ 0 ≫ g := by
+    tgt_eq := by
+      rw [← e₁₂.tgt_eq, trunc_map, trunc_map']
+      have : yonedaEquiv.symm (e₁₂.edge) = stdSimplex.δ 0 ≫ g := by
         rw [← horn_from_edges_restr₀ e₀₁ e₁₂, comm, ← Category.assoc, horn₂₁.incl₀]
       rw [push_yonedaEquiv this]
       have : δ 0 ≫ δ 0 = δ 0 ≫ @δ 1 1 :=
@@ -145,17 +128,17 @@ def fromHornExtension
   }
   exact {
     simplex := (truncEquiv 2) <| yonedaEquiv g
-    h₀₁ := by
+    d₂ := by
       rw [trunc_map]
-      have : yonedaEquiv.symm (e₀₁.simplex) = stdSimplex.δ 2 ≫ g := by
+      have : yonedaEquiv.symm (e₀₁.edge) = stdSimplex.δ 2 ≫ g := by
         rw [← horn_from_edges_restr₁ e₀₁ e₁₂, comm, ← Category.assoc, horn₂₁.incl₂]
       rw [← push_yonedaEquiv' this]
-    h₁₂ := by
+    d₀ := by
       rw [trunc_map]
-      have : yonedaEquiv.symm (e₁₂.simplex) = stdSimplex.δ 0 ≫ g := by
+      have : yonedaEquiv.symm (e₁₂.edge) = stdSimplex.δ 0 ≫ g := by
         rw [← horn_from_edges_restr₀ e₀₁ e₁₂, comm, ← Category.assoc, horn₂₁.incl₀]
       rw [← push_yonedaEquiv' this]
-    h₀₂ := by
+    d₁ := by
       rw [trunc_map]
       dsimp only [len_mk, id_eq, Nat.reduceAdd, Fin.isValue, eq_mpr_eq_cast, cast_eq, op_comp,
         Fin.succ_zero_eq_one, Fin.castSucc_zero]
@@ -165,7 +148,8 @@ def fromHornExtension
 end horn₂₁
 
 namespace horn₃₁
-open Truncated (CompStruct Edge truncEquiv trunc_map trunc_map')
+open Truncated (Edge Edge.edgeMap Edge.CompStruct truncEquiv trunc_map trunc_map')
+open Truncated.Edge
 
 variable {S : SSet}
 variable
@@ -205,14 +189,14 @@ def multicoforkFromFaces : Limits.Multicofork multispanIndex :=
         congr 1
       -- rw doesn't work because the statement is about `SSet`, not `Truncated 2`
       . apply Eq.trans
-        exact f₂.h₀₁
-        symm; exact f₃.h₀₁
+        exact f₂.d₂
+        symm; exact f₃.d₂
       . apply Eq.trans
-        exact f₃.h₁₂
-        symm; exact f₀.h₀₁
+        exact f₃.d₀
+        symm; exact f₀.d₂
       . apply Eq.trans
-        exact f₀.h₀₂
-        symm; exact f₂.h₁₂)
+        exact f₀.d₁
+        symm; exact f₂.d₀)
 
 /--
 Use the fact that `Λ[3, 1]` is the coequalizer of `multicoforkFromFaces` allows the
@@ -252,25 +236,26 @@ def fromHornExtension
     (comm : fromFaces f₃ f₀ f₂ = Λ[3, 1].ι ≫ g) :
     (CompStruct e₀₂ e₂₃ e₀₃) where
   simplex := (truncEquiv 2) <| S.map (SimplexCategory.δ 1).op (yonedaEquiv g)
-  h₀₁ := by
+  d₂ := by
     have := δ_comp_δ (n := 1) (i := 1) (j := 2) (by simp)
     dsimp only [Nat.reduceAdd, Fin.isValue, Fin.reduceSucc, Fin.castSucc_one] at this
-    rw [← f₃.h₀₂, trunc_map, trunc_map', ← FunctorToTypes.map_comp_apply, ← op_comp,
+    rw [← f₃.d₁, trunc_map, trunc_map', ← FunctorToTypes.map_comp_apply, ← op_comp,
       push_yonedaEquiv (horn_extension_face₃ f₃ f₀ f₂ comm), this]
-  h₁₂ := by
-    rw [← f₀.h₁₂, trunc_map, trunc_map', ← FunctorToTypes.map_comp_apply, ← op_comp,
+  d₀ := by
+    rw [← f₀.d₀, trunc_map, trunc_map', ← FunctorToTypes.map_comp_apply, ← op_comp,
       push_yonedaEquiv (horn_extension_face₀ f₃ f₀ f₂ comm)]
     rfl
-  h₀₂ := by
+  d₁ := by
     have := δ_comp_δ (n := 1) (i := 1) (j := 1) (by simp)
     dsimp only [Nat.reduceAdd, Fin.isValue, Fin.reduceSucc, Fin.castSucc_one] at this
-    rw [← f₂.h₀₂, trunc_map, trunc_map', ← FunctorToTypes.map_comp_apply, ← op_comp,
+    rw [← f₂.d₁, trunc_map, trunc_map', ← FunctorToTypes.map_comp_apply, ← op_comp,
       push_yonedaEquiv (horn_extension_face₂ f₃ f₀ f₂ comm), this]
 
 end horn₃₁
 
 namespace horn₃₂
-open Truncated (CompStruct Edge truncEquiv trunc_map trunc_map')
+open Truncated (Edge Edge.edgeMap Edge.CompStruct truncEquiv trunc_map trunc_map')
+open Truncated.Edge
 
 variable {S : SSet}
 variable
@@ -310,14 +295,14 @@ def multicoforkFromFaces : Limits.Multicofork multispanIndex :=
         congr 1
       -- rw doesn't work because the statement is about `SSet`, not `Truncated 2`
       . apply Eq.trans
-        exact f₁.h₀₁
-        symm; exact f₃.h₀₂
+        exact f₁.d₂
+        symm; exact f₃.d₁
       . apply Eq.trans
-        exact f₃.h₁₂
-        symm; exact f₀.h₀₁
+        exact f₃.d₀
+        symm; exact f₀.d₂
       . apply Eq.trans
-        exact f₀.h₁₂
-        symm; exact f₁.h₁₂)
+        exact f₀.d₀
+        symm; exact f₁.d₀)
 
 /--
 Use the fact that `Λ[3, 2]` is the coequalizer of `multicoforkFromFaces` allows the
@@ -357,20 +342,20 @@ def fromHornExtension
     (comm : fromFaces f₃ f₀ f₁ = Λ[3, 2].ι ≫ g) :
     (CompStruct e₀₁ e₁₃ e₀₃) where
   simplex := (truncEquiv 2) <| S.map (SimplexCategory.δ 2).op (yonedaEquiv g)
-  h₀₁ := by
+  d₂ := by
     have := δ_comp_δ (n := 1) (i := 2) (j := 2) (by simp)
     dsimp only [Nat.reduceAdd, Fin.isValue, Fin.reduceSucc, Fin.reduceCastSucc] at this
-    rw [← f₃.h₀₁, trunc_map, trunc_map', ← FunctorToTypes.map_comp_apply, ← op_comp,
+    rw [← f₃.d₂, trunc_map, trunc_map', ← FunctorToTypes.map_comp_apply, ← op_comp,
       push_yonedaEquiv (horn_extension_face₃ f₃ f₀ f₁ comm), this]
-  h₁₂ := by
+  d₀ := by
     have := δ_comp_δ (n := 1) (i := 0) (j := 1) (by simp)
     dsimp only [Nat.reduceAdd, Fin.isValue, Fin.succ_one_eq_two, Fin.castSucc_zero] at this
-    rw [← f₀.h₀₂, trunc_map, trunc_map', ← FunctorToTypes.map_comp_apply, ← op_comp,
+    rw [← f₀.d₁, trunc_map, trunc_map', ← FunctorToTypes.map_comp_apply, ← op_comp,
       push_yonedaEquiv (horn_extension_face₀ f₃ f₀ f₁ comm), this]
-  h₀₂ := by
+  d₁ := by
     have := δ_comp_δ (n := 1) (i := 1) (j := 1) (by simp)
     dsimp only [Nat.reduceAdd, Fin.isValue, Fin.succ_one_eq_two, Fin.castSucc_one] at this
-    rw [← f₁.h₀₂, trunc_map, trunc_map', ← FunctorToTypes.map_comp_apply, ← op_comp,
+    rw [← f₁.d₁, trunc_map, trunc_map', ← FunctorToTypes.map_comp_apply, ← op_comp,
       push_yonedaEquiv (horn_extension_face₁ f₃ f₀ f₁ comm), this]
 
 end horn₃₂
@@ -400,56 +385,21 @@ instance two_truncatation_of_qc_is_2_trunc_qc {X : SSet} [Quasicategory X] :
 
 namespace Edge
 
-def id {A : Truncated 2} (x : A _⦋0⦌₂) : Edge x x where
-  simplex := A.map (tr (σ 0)).op x
-  h₀ := by
-    rw [← FunctorToTypes.map_comp_apply, ← op_comp,
-      δ₂_one_comp_σ₂_zero, op_id, FunctorToTypes.map_id_apply]
-  h₁ := by
-    rw [← FunctorToTypes.map_comp_apply, ← op_comp,
-      δ₂_zero_comp_σ₂_zero, op_id, FunctorToTypes.map_id_apply]
-end Edge
-
 namespace CompStruct
 open Edge
 
 variable {A : Truncated 2}
 
-def compId {x y : A _⦋0⦌₂} (e : Edge x y) : CompStruct e (id y) e where
-  simplex := A.map (tr (σ 1)).op e.simplex
-  h₀₁ := by
-    rw [← FunctorToTypes.map_comp_apply, ← op_comp, δ₂_two_comp_σ₂_one, op_id,
-      FunctorToTypes.map_id_apply]
-  h₁₂ := by
-    rw [← FunctorToTypes.map_comp_apply, ← op_comp, δ₂_zero_comp_σ₂_one, op_comp,
-      FunctorToTypes.map_comp_apply, e.h₁]
-    rfl
-  h₀₂ := by
-    rw [← FunctorToTypes.map_comp_apply, ← op_comp, ← Hom.tr_comp]
-    dsimp only [tr]
-    rw [δ_comp_σ_self' (by rfl)]
-    apply FunctorToTypes.map_id_apply
-
-def idComp {x y : A _⦋0⦌₂} (e : Edge x y) : CompStruct (id x) e e where
-  simplex := A.map (tr (σ 0)).op e.simplex
-  h₀₁ := by
-    rw [← FunctorToTypes.map_comp_apply, ← op_comp, δ₂_two_comp_σ₂_zero,
-      op_comp, FunctorToTypes.map_comp_apply, e.h₀]
-    rfl
-  h₁₂ := by
-    rw [← FunctorToTypes.map_comp_apply, ← op_comp, δ₂_zero_comp_σ₂_zero, op_id,
-      FunctorToTypes.map_id_apply]
-  h₀₂ := by
-    rw [← FunctorToTypes.map_comp_apply, ← op_comp, δ₂_one_comp_σ₂_zero, op_id,
-      FunctorToTypes.map_id_apply]
-
 def idCompId (x : A _⦋0⦌₂) := compId (id x)
 
 end CompStruct
 
+end Edge
+
 section homotopy_def
 
-open Edge (id)
+open Edge
+
 /--
 Two edges `f` and `g` are left homotopic if there is a 2-simplex with
 (0, 1)-edge `f`, (0, 2)-edge `g` and (1, 2)-edge `id`. We use `Nonempty` to
@@ -458,7 +408,9 @@ have a `Prop` valued `HomotopicL`.
 abbrev HomotopicL {A : Truncated 2} {x y : A _⦋0⦌₂} (f g : Edge x y) := Nonempty (CompStruct f (id y) g)
 
 /--
-See `HomotopicL`.
+Two edges `f` and `g` are right homotopic if there is a 2-simplex with
+(0, 1)-edge `id`, (0, 2)-edge `g` and (1, 2)-edge `f`. We use `Nonempty` to
+have a `Prop` valued `HomotopicL`.
 -/
 abbrev HomotopicR {A : Truncated 2} {x y : A _⦋0⦌₂} (f g : Edge x y) := Nonempty (CompStruct (id x) f g)
 
@@ -467,10 +419,10 @@ end homotopy_def
 end Truncated
 
 namespace Quasicategory₂
-open Truncated CompStruct
+open Truncated Edge.CompStruct
 
 section homotopy_relation
-open Edge (id)
+open Edge
 
 variable {A : Truncated 2} [Quasicategory₂ A]
 
@@ -534,6 +486,7 @@ theorem HomotopicL_iff_HomotopicR {x y : A _⦋0⦌₂} {f g : Edge x y} :
 end homotopy_relation
 
 section basic_homotopies
+open Edge
 
 variable {A : Truncated 2} [Quasicategory₂ A]
 variable {x y z : A _⦋0⦌₂}
@@ -577,6 +530,7 @@ lemma transport_all_edges {f f' : Edge x y} {g g' : Edge y z}
 end basic_homotopies
 
 section homotopy_category
+open Edge
 
 variable {A : Truncated 2} [Quasicategory₂ A]
 
@@ -666,6 +620,7 @@ end homotopy_category
 
 section isomorphism_of_htpy_categories
 open Cat (FreeRefl)
+open Edge
 
 universe u
 variable {A : Truncated 2} [Quasicategory₂ A]
@@ -676,7 +631,7 @@ variable {A : Truncated 2} [Quasicategory₂ A]
 noncomputable
 def quotientReflPrefunctor₂ : (OneTruncation₂ A) ⥤rq (HomotopyCategory₂ A) where
   obj := id
-  map f := Quotient.mk' { simplex := f.edge, h₀ := f.src_eq, h₁ := f.tgt_eq }
+  map f := Quotient.mk' { edge := f.edge, src_eq := f.src_eq, tgt_eq := f.tgt_eq }
 
 /--
   By the adjunction `ReflQuiv.adj`, we obtain a functor from the free category on the reflexive
@@ -732,7 +687,7 @@ theorem qFunctor_respects_horel₂ (x y : FreeRefl.{u} (OneTruncation₂.{u} A))
     composePath_toPath]
   apply Quotient.sound
   apply composeEdges_unique
-  exact { simplex := r, h₀₁ := rfl, h₁₂ := rfl, h₀₂ := rfl }
+  exact { simplex := r, d₂ := rfl, d₀ := rfl, d₁ := rfl }
 
 /--
 An edge from `x₀` to `x₁` in a 2-truncated simplicial set defines an arrow in the refl quiver
@@ -740,9 +695,9 @@ An edge from `x₀` to `x₁` in a 2-truncated simplicial set defines an arrow i
 -/
 def edgeToHom {x₀ x₁ : A _⦋0⦌₂} (f : Edge x₀ x₁) :
     @Quiver.Hom (OneTruncation₂.{u} A) _ x₀ x₁ where
-  edge := f.simplex
-  src_eq := f.h₀
-  tgt_eq := f.h₁
+  edge := f.edge
+  src_eq := f.src_eq
+  tgt_eq := f.tgt_eq
 
 /--
 An edge from `x₀` to `x₁` in a 2-truncated simplicial set defines an arrow in the free category
@@ -777,9 +732,9 @@ lemma homotopic_edges_are_equiv {x₀ x₁ : A _⦋0⦌₂} (f g : Edge.{u} x₀
   rcases HomotopicL.symm htpy with ⟨htpy⟩
   rw [← Quiver.Path.comp_toPath_eq_cons]
   apply HoRel₂.mk' (φ := htpy.simplex) <;> (dsimp [edgeToHom]; symm)
-  . exact htpy.h₀₁
-  . exact htpy.h₁₂
-  . exact htpy.h₀₂
+  . exact htpy.d₂
+  . exact htpy.d₀
+  . exact htpy.d₁
 
 /--
   If a reflexive prefunctor `F : FreeRefl (OneTruncation₂ A) ⥤rq C` respects
@@ -859,9 +814,9 @@ def lift₂ {C : Type} [Category C] (F : FreeRefl.{u} (OneTruncation₂.{u} A) �
       dsimp only [h', Quotient.lift_mk]
       apply h
       apply HoRel₂.mk' (φ := p.snd.simplex) <;> symm
-      . exact p.snd.h₀₁
-      . exact p.snd.h₁₂
-      . exact p.snd.h₀₂
+      . exact p.snd.d₂
+      . exact p.snd.d₀
+      . exact p.snd.d₁
   }
 
 lemma is_lift₂ {C : Type} [Category C] (F : FreeRefl.{u} (OneTruncation₂.{u} A) ⥤ C)
